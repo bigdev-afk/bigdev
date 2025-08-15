@@ -5,7 +5,19 @@ import User from '../models/userSchema.js';
 
 const router = express.Router();
 
-// Signup
+// In-memory token blacklist (use Redis or DB in production)
+let tokenBlacklist = [];
+
+// Middleware to check if token is blacklisted
+export const checkBlacklist = (req, res, next) => {
+  const token = req.header('Authorization')?.split(' ')[1];
+  if (token && tokenBlacklist.includes(token)) {
+    return res.status(401).json({ msg: 'Token has been revoked' });
+  }
+  next();
+};
+
+// =================== SIGNUP ===================
 router.post('/signup', async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -28,7 +40,7 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// Login
+// =================== LOGIN ===================
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -45,6 +57,23 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
+  }
+});
+
+// =================== LOGOUT ===================
+router.post('/logout', (req, res) => {
+  const token = req.header('Authorization')?.split(' ')[1];
+
+  if (!token) {
+    return res.status(400).json({ msg: 'No token provided' });
+  }
+
+  try {
+    jwt.verify(token, process.env.JWT_SECRET); // Verify before blacklisting
+    tokenBlacklist.push(token);
+    res.json({ msg: 'Logged out successfully' });
+  } catch (err) {
+    res.status(400).json({ msg: 'Invalid token' });
   }
 });
 
