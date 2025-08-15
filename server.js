@@ -4,6 +4,7 @@ import connectDB from "./config/db.js";
 import cors from "cors";
 import authRoutes from './routes/authRoute.js';
 import profileRoutes from './routes/profileRoute.js';
+import quizRoutes from './routes/quizRoutes.js'
 dotenv.config();
 
 connectDB();
@@ -17,6 +18,7 @@ app.use(cors());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/quizzess', quizRoutes);
 
 // Test route
 app.get("/", (req, res) => {
