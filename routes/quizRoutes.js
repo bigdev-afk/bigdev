@@ -20,6 +20,8 @@ router.get('/featured', getFeaturedQuizzes);
 router.get('/:id', getQuizById);
 router.post('/:id/bookmark', protect, toggleBookmark);
 router.post('/:id/results', protect, submitQuizResults);
+
+// ✅ POST /api/quizzess -> create quiz
 router.route('/')
   .post(protect, admin, createQuiz);
 

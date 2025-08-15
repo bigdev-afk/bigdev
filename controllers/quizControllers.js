@@ -142,50 +142,85 @@ const submitQuizResults = asyncHandler(async (req, res) => {
 // @route   POST /api/quizzes
 // @access  Private/Admin
 const createQuiz = asyncHandler(async (req, res) => {
-  const {
-    title,
-    description,
-    category,
-    difficulty,
-    timeLimit,
-    isFeatured,
-    questions,
-  } = req.body;
+  try {
+    // Check admin user
+    if (!req.user || !req.user.isAdmin) {
+      return res.status(401).json({ message: "Unauthorized: Admin only" });
+    }
 
-  // Validate required fields
-  if (
-    !title ||
-    !description ||
-    !category ||
-    !difficulty ||
-    !questions ||
-    questions.length === 0
-  ) {
-    res.status(400);
-    throw new Error(
-      "Please include all required fields and at least one question"
+    console.log("req.user:", req.user);  // Debugging
+    console.log("req.body:", req.body);  // Debugging
+
+    const {
+      title,
+      description,
+      category,
+      difficulty,
+      timeLimit,
+      isFeatured,
+      questions,
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !description || !category || !difficulty) {
+      return res.status(400).json({
+        message: "Missing required fields: title, description, category, difficulty",
+      });
+    }
+
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        message: "Questions array is required and must contain at least one question",
+      });
+    }
+
+    // Validate each question
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (
+        !q.text ||
+        !q.options ||
+        !Array.isArray(q.options) ||
+        q.options.length === 0 ||
+        q.correctAnswer === undefined ||
+        q.explanation === undefined
+      ) {
+        return res.status(400).json({
+          message: `Question ${i + 1} is invalid. Each question must include text, options array, correctAnswer, and explanation`,
+        });
+      }
+    }
+
+    // Step 1: Create quiz first (without questions)
+    const quiz = await Quiz.create({
+      title,
+      description,
+      category,
+      difficulty,
+      timeLimit: timeLimit || 15,
+      isFeatured: isFeatured || false,
+      questions: [], // placeholder
+      createdBy: req.user._id,
+    });
+
+    // Step 2: Create questions with reference to quiz
+    const createdQuestions = await Question.create(
+      questions.map((q) => ({ ...q, quiz: quiz._id }))
     );
+
+    // Step 3: Update quiz with question IDs
+    quiz.questions = createdQuestions.map((q) => q._id);
+    await quiz.save();
+
+    // Step 4: Respond with full quiz + questions
+    res.status(201).json({
+      message: "Quiz created successfully",
+      quiz: { ...quiz._doc, questions: createdQuestions },
+    });
+  } catch (error) {
+    console.error("Error creating quiz:", error);
+    res.status(500).json({ message: "Server Error: " + error.message });
   }
-
-  // Create questions first
-  const createdQuestions = await Question.create(questions);
-
-  // Create quiz with references to questions
-  const quiz = await Quiz.create({
-    title,
-    description,
-    category,
-    difficulty,
-    timeLimit: timeLimit || 15,
-    isFeatured: isFeatured || false,
-    questions: createdQuestions.map((q) => q._id),
-    createdBy: req.user._id,
-  });
-
-  res.status(201).json({
-    ...quiz._doc,
-    questions: createdQuestions,
-  });
 });
 
 // @desc    Update a quiz (Admin)
