@@ -1,48 +1,62 @@
 import jwt from 'jsonwebtoken';
+import asyncHandler from 'express-async-handler';
 import User from '../models/userSchema.js';
 
-// In-memory token blacklist (use Redis/DB in production)
+// In-memory token blacklist (for production use Redis or DB)
 let tokenBlacklist = [];
 
 // Middleware to check if token is blacklisted
-export const checkBlacklist = (req, res, next) => {
+const checkBlacklist = (req, res, next) => {
   const token = req.header('Authorization')?.split(' ')[1];
   if (token && tokenBlacklist.includes(token)) {
-    return res.status(401).json({ msg: 'Token has been revoked' });
+    return res.status(401).json({ message: 'Token has been revoked' });
   }
   next();
 };
 
 // Protect middleware
-export const protect = async (req, res, next) => {
+const protect = asyncHandler(async (req, res, next) => {
   let token;
 
   if (req.headers.authorization?.startsWith('Bearer')) {
-    try {
-      token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    token = req.headers.authorization.split(' ')[1];
 
-      console.log('Decoded token:', decoded);
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       const user = await User.findById(decoded.id).select('-password');
       if (!user) {
-        return res.status(404).json({ message: 'User not found' });
+        res.status(404);
+        throw new Error('User not found');
       }
 
       req.user = user;
       next();
     } catch (error) {
       console.error('Auth error:', error.message);
-      return res.status(401).json({ message: 'Not authorized, token failed' });
+      res.status(401);
+      throw new Error('Not authorized, token failed');
     }
   } else {
-    return res.status(401).json({ message: 'Not authorized, no token' });
+    res.status(401);
+    throw new Error('Not authorized, no token');
   }
-};
+});
 
-// Add token to blacklist on logout
-export const logout = (token) => {
+// Admin middleware
+const admin = asyncHandler(async (req, res, next) => {
+  if (req.user && req.user.isAdmin) {
+    next();
+  } else {
+    res.status(403);
+    throw new Error('Not authorized as an admin');
+  }
+});
+
+// Logout function — adds token to blacklist
+const logout = (token) => {
   tokenBlacklist.push(token);
 };
 
-export default { protect, checkBlacklist, logout };
+// Export everything as named exports
+export { protect, admin, checkBlacklist, logout };

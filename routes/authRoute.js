@@ -12,16 +12,25 @@ router.post('/signup', async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
+    // Check if user exists
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ msg: 'User already exists' });
 
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    user = new User({ name, email, password: hashedPassword });
+    // Create user with isAdmin = false
+    user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      isAdmin: false // ✅ Always false on signup
+    });
+
     await user.save();
 
-    // Create profile automatically
+    // Create default profile automatically
     const profile = new Profile({
       user: user._id,
       name: user.name,
@@ -41,11 +50,26 @@ router.post('/signup', async (req, res) => {
         }
       }
     });
+
     await profile.save();
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    // Send response
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isAdmin: user.isAdmin
+      }
+    });
 
   } catch (err) {
     console.error(err.message);
@@ -64,9 +88,17 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isAdmin: user.isAdmin
+      }
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
