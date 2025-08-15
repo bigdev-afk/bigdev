@@ -20,7 +20,7 @@ app.use(cors());
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/quizzess', quizRoutes);
-app.use('app/contests', contestsRoute)
+app.use('api/contests', contestsRoute)
 
 // Test route
 app.get("/", (req, res) => {
