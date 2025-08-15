@@ -3,19 +3,20 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cors from "cors";
 import authRoutes from './routes/authRoute.js';
+import profileRoutes from './routes/profileRoute.js';
 dotenv.config();
-connectDB();
 
+connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(express.json());
+app.use(cors());
 
-// Enable CORS
-app.use(cors()); // ✅ Allows all origins by default
-
+// Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Test route
 app.get("/", (req, res) => {
